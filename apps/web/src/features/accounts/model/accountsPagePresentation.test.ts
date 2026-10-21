@@ -556,6 +556,40 @@ describe('accountsPagePresentation', () => {
   describe('selectAccountQuotaMainListWindows', () => {
     const makeRow = (provider = 'codex') => makeAccountRow(provider);
 
+    it('lists credential quota contract windows that carry no window length', () => {
+      const monthly = makeQuotaWindow({
+        key: 'credential:0:0',
+        kind: 'monthly',
+        windowMode: 'unknown',
+        source: 'credential',
+      });
+      const bonus = makeQuotaWindow({
+        key: 'credential:0:1',
+        windowMode: 'unknown',
+        source: 'credential',
+      });
+      const extra = makeQuotaWindow({
+        key: 'credential:0:2',
+        windowMode: 'unknown',
+        source: 'credential',
+      });
+
+      expect(
+        selectAccountQuotaMainListWindows(makeRow('kiro4cpa'), [monthly, bonus, extra])
+      ).toEqual([monthly, bonus]);
+    });
+
+    it('keeps non-standard windows of other providers out of the main list', () => {
+      const unknown = makeQuotaWindow({
+        key: 'claude:extra',
+        windowMode: 'unknown',
+        source: 'claude',
+      });
+
+      expect(selectAccountQuotaMainListWindows(makeRow('claude'), [unknown])).toEqual([]);
+      expect(selectAccountQuotaMainListWindows(makeRow('qwen'), [unknown])).toEqual([]);
+    });
+
     it('selects 5h + weekly when 5h, weekly, and monthly are present (ascending duration)', () => {
       const fiveHour = makeQuotaWindow({
         key: '5h',
