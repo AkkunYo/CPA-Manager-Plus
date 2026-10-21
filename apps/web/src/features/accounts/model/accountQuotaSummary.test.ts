@@ -595,6 +595,50 @@ describe('resolveAccountQuota', () => {
     const mismatchSummary = resolveAccountQuota(file, otherStores);
     expect(mismatchSummary.status).toBe('unknown');
   });
+
+  it('resolves the CPA credential quota contract for declared non built-in providers', () => {
+    const file: AuthFileItem = {
+      name: 'kiro.json',
+      type: 'kiro4cpa',
+      authIndex: 'k-1',
+      supports_quota: true,
+    };
+    const stores = emptyStores();
+    stores.credentialQuota = {
+      'kiro.json::k-1': {
+        status: 'success',
+        authFileKey: 'kiro.json::k-1',
+        authFileName: 'kiro.json',
+        authIndex: 'k-1',
+        authFileIdentityVerified: true,
+        plan: 'KIRO FREE',
+        observedAtMs: 1726000000100,
+        fetchedAtMs: 1726000000100,
+        windows: [
+          {
+            id: '0:0',
+            groupLabel: 'Credits',
+            window: 'monthly',
+            description: '2.79 / 50',
+            remainingPercent: 94,
+            resetTime: '2026-11-01T00:00:00Z',
+          },
+        ],
+      },
+    };
+
+    const summary = resolveAccountQuota(file, stores);
+    expect(summary.status).toBe('ok');
+    expect(summary.remainingPercent).toBe(94);
+    expect(summary.planType).toBe('KIRO FREE');
+    expect(summary.resetAtMs).toBe(Date.parse('2026-11-01T00:00:00Z'));
+    expect(summary.resetAccuracy).toBe('exact');
+
+    // Without CPA's supports_quota declaration the cached contract state is ignored.
+    const undeclared = resolveAccountQuota({ ...file, supports_quota: undefined }, stores);
+    expect(undeclared.status).toBe('unknown');
+    expect(undeclared.planType).toBeNull();
+  });
 });
 
 describe('hasConfirmedXaiBillingEntitlement', () => {

@@ -13,6 +13,7 @@ import {
   CLAUDE_CONFIG,
   CODEX_CONFIG,
   CODEX_SUMMARY_CONFIG,
+  CREDENTIAL_QUOTA_CONFIG,
   META_CONFIG,
   XAI_CONFIG,
 } from '@/components/quota';
@@ -569,6 +570,7 @@ const { mocks } = vi.hoisted(() => {
         antigravityQuota: {},
         claudeQuota: {},
         codexQuota: {},
+        credentialQuota: {},
         devinQuota: {},
         kimiQuota: {},
         metaQuota: {},
@@ -576,6 +578,7 @@ const { mocks } = vi.hoisted(() => {
         setAntigravityQuota: vi.fn(),
         setClaudeQuota: vi.fn(),
         setCodexQuota: vi.fn(),
+        setCredentialQuota: vi.fn(),
         setDevinQuota: vi.fn(),
         setKimiQuota: vi.fn(),
         setMetaQuota: vi.fn(),
@@ -975,6 +978,7 @@ vi.mock('@/stores', () => ({
       antigravityQuota: Record<string, never>;
       claudeQuota: Record<string, never>;
       codexQuota: Record<string, never>;
+      credentialQuota: Record<string, never>;
       devinQuota: Record<string, never>;
       kimiQuota: Record<string, never>;
       metaQuota: Record<string, never>;
@@ -982,6 +986,7 @@ vi.mock('@/stores', () => ({
       setAntigravityQuota: () => void;
       setClaudeQuota: () => void;
       setCodexQuota: () => void;
+      setCredentialQuota: () => void;
       setDevinQuota: () => void;
       setKimiQuota: () => void;
       setMetaQuota: () => void;
@@ -1449,6 +1454,7 @@ describe('AccountsPage replacement flows', () => {
     mocks.quotaState.antigravityQuota = {};
     mocks.quotaState.claudeQuota = {};
     mocks.quotaState.codexQuota = {};
+    mocks.quotaState.credentialQuota = {};
     mocks.quotaState.devinQuota = {};
     mocks.quotaState.kimiQuota = {};
     mocks.quotaState.metaQuota = {};
@@ -1457,6 +1463,7 @@ describe('AccountsPage replacement flows', () => {
     mocks.quotaState.setAntigravityQuota.mockReset();
     mocks.quotaState.setClaudeQuota.mockReset();
     mocks.quotaState.setCodexQuota.mockReset();
+    mocks.quotaState.setCredentialQuota.mockReset();
     mocks.quotaState.setDevinQuota.mockReset();
     mocks.quotaState.setKimiQuota.mockReset();
     mocks.quotaState.setMetaQuota.mockReset();
@@ -19158,6 +19165,65 @@ describe('AccountsPage replacement flows', () => {
           .find((b) => readText(b.props.children).includes('accounts.refresh_quota'));
         expect(drawerRefresh).toBeDefined();
       }
+    });
+
+    it('refreshes declared plugin credentials through the CPA credential quota contract', async () => {
+      const filePlugin: AuthFileItem = {
+        name: 'kiro-card.json',
+        type: 'kiro4cpa',
+        provider: 'kiro4cpa',
+        auth_index: 'auth-k-card',
+        authIndex: 'auth-k-card',
+        account: 'kiro-card@example.com',
+        auth_kind: 'oauth',
+        runtimeOnly: false,
+        supports_quota: true,
+        quota_provider: 'kiro4cpa',
+      };
+      mocks.files = [filePlugin];
+      const contractSpy = vi
+        .spyOn(CREDENTIAL_QUOTA_CONFIG, 'fetchQuota')
+        .mockResolvedValue({ windows: [], observedAtMs: Date.now(), plan: 'KIRO FREE' });
+
+      const renderer = await renderAccountsPage();
+      await flushPromises();
+
+      const rowButtons = renderer.root.findAllByType(Button);
+      const rowRefreshButton = rowButtons.find(
+        (b) => typeof b.props.className === 'string' && b.props.className.includes('accountIconButtonRefresh')
+      );
+      expect(rowRefreshButton).toBeDefined();
+
+      await act(async () => {
+        rowRefreshButton!.props.onClick();
+        await Promise.resolve();
+      });
+      await flushPromises();
+      expect(contractSpy).toHaveBeenCalledTimes(1);
+      expect(mocks.quotaState.setCredentialQuota).toHaveBeenCalled();
+    });
+
+    it('does not render quota refresh button for plugin credentials without CPA quota support', async () => {
+      const filePlugin: AuthFileItem = {
+        name: 'kiro-silent.json',
+        type: 'kiro4cpa',
+        provider: 'kiro4cpa',
+        auth_index: 'auth-k-silent',
+        authIndex: 'auth-k-silent',
+        auth_kind: 'oauth',
+        runtimeOnly: false,
+      };
+      mocks.files = [filePlugin];
+
+      const renderer = await renderAccountsPage();
+      await flushPromises();
+
+      const rowRefreshButton = renderer.root
+        .findAllByType(Button)
+        .find(
+          (b) => typeof b.props.className === 'string' && b.props.className.includes('accountIconButtonRefresh')
+        );
+      expect(rowRefreshButton).toBeUndefined();
     });
 
     it('does not render quota refresh button for runtimeOnly Meta credentials', async () => {

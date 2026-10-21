@@ -6,6 +6,8 @@ import type {
   CodexQuotaState,
   CodexQuotaWindow,
   CodexRateLimitResetCredit,
+  CredentialQuotaData,
+  CredentialQuotaState,
   CredentialScopedQuotaState,
   DevinQuotaData,
   DevinQuotaState,
@@ -19,6 +21,7 @@ import type { UsageHeaderSnapshot } from '@/services/api/usageService';
 import type { AuthFilesApiRequestScope } from '@/services/api/authFiles';
 import { createScopedApiRequestConfig } from '@/services/api/client';
 import { fetchXaiSubscription } from '@/utils/quota/xaiSubscription';
+import { fetchCredentialQuota } from '@/utils/quota/credentialQuota';
 import type {
   AntigravityQuotaData,
   ClaudeQuotaData,
@@ -62,7 +65,15 @@ import {
   scopeQuotaStateToCredential,
 } from '@/utils/quota/credentialScope';
 
-type QuotaType = 'antigravity' | 'claude' | 'codex' | 'kimi' | 'xai' | 'devin' | 'meta';
+type QuotaType =
+  | 'antigravity'
+  | 'claude'
+  | 'codex'
+  | 'kimi'
+  | 'xai'
+  | 'devin'
+  | 'meta'
+  | 'credential';
 
 export type { QuotaFetchContext };
 
@@ -936,3 +947,36 @@ export const META_CONFIG: QuotaConfig<MetaQuotaState, MetaQuotaData> = {
   scopeState: scopeCredentialQuotaState,
 };
 
+
+export const CREDENTIAL_QUOTA_CONFIG: QuotaConfig<CredentialQuotaState, CredentialQuotaData> = {
+  type: 'credential',
+  i18nPrefix: 'credential_quota',
+  fetchQuota: fetchCredentialQuota,
+  getStoreKey: getQuotaCredentialStoreKey,
+  buildLoadingState: (file) => ({
+    status: 'loading',
+    windows: [],
+    observedAtMs: Date.now(),
+    plan: null,
+    ...buildQuotaCredentialIdentity(file),
+  }),
+  buildSuccessState: (data, file) => ({
+    status: 'success',
+    windows: data.windows,
+    observedAtMs: data.observedAtMs,
+    plan: data.plan,
+    ...buildQuotaCredentialIdentity(file),
+    fetchedAtMs: data.observedAtMs,
+  }),
+  buildErrorState: (message, status, file) => ({
+    status: 'error',
+    windows: [],
+    observedAtMs: Date.now(),
+    plan: null,
+    error: message,
+    errorStatus: status,
+    ...buildQuotaCredentialIdentity(file),
+    failedAtMs: Date.now(),
+  }),
+  scopeState: scopeCredentialQuotaState,
+};

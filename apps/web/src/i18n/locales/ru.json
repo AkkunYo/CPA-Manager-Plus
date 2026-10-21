@@ -2492,6 +2492,11 @@
     "usage_amount": "Осталось {{remaining}} / {{limit}}",
     "reset_unknown": "сброс неизвестен"
   },
+  "credential_quota": {
+    "title": "Квота учётных данных",
+    "missing_identity": "У учётных данных отсутствует auth_index",
+    "empty_data": "Нет данных о квоте"
+  },
   "devin_quota": {
     "title": "Квота Devin",
     "empty_title": "Файлы авторизации Devin отсутствуют",
