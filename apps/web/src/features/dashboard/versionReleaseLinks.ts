@@ -1,7 +1,9 @@
+import { MANAGER_REPOSITORY } from '@/utils/managerRepository';
+
 export type DashboardVersionReleaseTarget = 'manager' | 'core';
 
 const RELEASE_REPOSITORIES: Record<DashboardVersionReleaseTarget, string> = {
-  manager: 'seakee/CPA-Manager-Plus',
+  manager: MANAGER_REPOSITORY,
   core: 'router-for-me/CLIProxyAPI',
 };
 

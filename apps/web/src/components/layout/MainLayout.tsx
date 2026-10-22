@@ -54,10 +54,11 @@ import { usePanelFeatureAvailability } from '@/hooks/usePanelFeatureAvailability
 import { getDemoLogoutPath, prefixRouteBase, stripRouteBase } from '@/features/demo/demoMode';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER, STORAGE_KEY_SIDEBAR } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
+import { MANAGER_REPOSITORY_URL } from '@/utils/managerRepository';
 import type { Theme, VisualEffectsMode } from '@/types';
 
 const SIDEBAR_ICON_SIZE = 20;
-const GITHUB_REPOSITORY_URL = 'https://github.com/seakee/CPA-Manager-Plus';
+const GITHUB_REPOSITORY_URL = MANAGER_REPOSITORY_URL;
 
 const sidebarIcons: Record<string, ReactNode> = {
   dashboard: <IconSidebarDashboard size={SIDEBAR_ICON_SIZE} />,
