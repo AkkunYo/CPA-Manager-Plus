@@ -165,6 +165,16 @@ export const normalizeProviderKey = (value: string) => {
 export const isQuotaRefreshSupportedProvider = (provider: string): boolean =>
   QUOTA_PROVIDER_TYPES.has(normalizeProviderKey(provider) as QuotaProviderType);
 
+/**
+ * Credentials outside the built-in providers fall back to the CPA credential
+ * quota contract when CPA declares `supports_quota` for them.
+ */
+export const usesCredentialQuotaContract = (file: AuthFileItem, provider: string): boolean =>
+  !isQuotaRefreshSupportedProvider(provider) && file.supports_quota === true;
+
+export const isQuotaRefreshSupportedCredential = (file: AuthFileItem, provider: string): boolean =>
+  isQuotaRefreshSupportedProvider(provider) || usesCredentialQuotaContract(file, provider);
+
 
 export const getEquivalentProviderKeys = (value: string): string[] => {
   const providerKey = normalizeProviderKey(value);

@@ -51,6 +51,7 @@ import {
   CLAUDE_CONFIG,
   CODEX_CONFIG,
   CODEX_SUMMARY_CONFIG,
+  CREDENTIAL_QUOTA_CONFIG,
   DEVIN_CONFIG,
   KIMI_CONFIG,
   META_CONFIG,
@@ -70,7 +71,12 @@ import { useInterval } from '@/hooks/useInterval';
 import { usePanelFeatureAvailability } from '@/hooks/usePanelFeatureAvailability';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { getAuthFileIcon, isQuotaRefreshSupportedProvider } from '@/features/authFiles/constants';
+import {
+  getAuthFileIcon,
+  isQuotaRefreshSupportedCredential,
+  isQuotaRefreshSupportedProvider,
+  usesCredentialQuotaContract,
+} from '@/features/authFiles/constants';
 import {
   useAuthFilesData,
   type AuthFilesCredentialMutation,
@@ -325,6 +331,8 @@ import type {
   CodexQuotaState,
   DevinQuotaData,
   DevinQuotaState,
+  CredentialQuotaData,
+  CredentialQuotaState,
   MetaQuotaData,
   MetaQuotaState,
   XaiQuotaState,
@@ -1378,6 +1386,7 @@ export function AccountsPage() {
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
+  const credentialQuota = useQuotaStore((state) => state.credentialQuota);
   const devinQuota = useQuotaStore((state) => state.devinQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const metaQuota = useQuotaStore((state) => state.metaQuota);
@@ -1387,16 +1396,27 @@ export function AccountsPage() {
       antigravityQuota,
       claudeQuota,
       codexQuota,
+      credentialQuota,
       devinQuota,
       kimiQuota,
       metaQuota,
       xaiQuota,
     }),
-    [antigravityQuota, claudeQuota, codexQuota, devinQuota, kimiQuota, metaQuota, xaiQuota]
+    [
+      antigravityQuota,
+      claudeQuota,
+      codexQuota,
+      credentialQuota,
+      devinQuota,
+      kimiQuota,
+      metaQuota,
+      xaiQuota,
+    ]
   );
   const setAntigravityQuota = useQuotaStore((state) => state.setAntigravityQuota);
   const setClaudeQuota = useQuotaStore((state) => state.setClaudeQuota);
   const setCodexQuota = useQuotaStore((state) => state.setCodexQuota);
+  const setCredentialQuota = useQuotaStore((state) => state.setCredentialQuota);
   const setDevinQuota = useQuotaStore((state) => state.setDevinQuota);
   const setKimiQuota = useQuotaStore((state) => state.setKimiQuota);
   const setMetaQuota = useQuotaStore((state) => state.setMetaQuota);
@@ -3092,6 +3112,9 @@ export function AccountsPage() {
           prune(META_CONFIG, setMetaQuota);
           break;
         default:
+          if (!isQuotaRefreshSupportedProvider(normalizedProvider)) {
+            prune(CREDENTIAL_QUOTA_CONFIG, setCredentialQuota);
+          }
           break;
       }
       return targetFiles;
@@ -3103,6 +3126,7 @@ export function AccountsPage() {
       setClaudeQuota,
       setCredentialEvidenceBoundaries,
       setCodexQuota,
+      setCredentialQuota,
       setDevinQuota,
       setKimiQuota,
       setMetaQuota,
@@ -6488,7 +6512,7 @@ export function AccountsPage() {
       row: AccountRow,
       mode: AccountQuotaRefreshMode = 'summary'
     ): Promise<AccountQuotaRefreshOutcome> => {
-      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider)) {
+      if (row.runtimeOnly || !isQuotaRefreshSupportedCredential(row.raw, row.provider)) {
         return { status: 'ignored' };
       }
       const refreshWithConfig = <TState, TData>(
@@ -6599,6 +6623,19 @@ export function AccountsPage() {
             )
           );
         default:
+          if (usesCredentialQuotaContract(row.raw, row.provider)) {
+            return toAccountQuotaRefreshOutcome(
+              await refreshWithConfig<CredentialQuotaState, CredentialQuotaData>(
+                CREDENTIAL_QUOTA_CONFIG,
+                setCredentialQuota,
+                getScopedQuotaState(
+                  CREDENTIAL_QUOTA_CONFIG,
+                  baseQuotaStores.credentialQuota,
+                  row.raw
+                )
+              )
+            );
+          }
           return { status: 'error', error: t('common.unknown_error') };
       }
     },
@@ -6607,6 +6644,7 @@ export function AccountsPage() {
       setAntigravityQuota,
       setClaudeQuota,
       setCodexQuota,
+      setCredentialQuota,
       setDevinQuota,
       setKimiQuota,
       setMetaQuota,
@@ -6624,7 +6662,7 @@ export function AccountsPage() {
         return currentBatch.promise;
       }
       const refreshable = targets.filter(
-        (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+        (row) => !row.runtimeOnly && isQuotaRefreshSupportedCredential(row.raw, row.provider)
       );
       if (refreshable.length === 0) {
         showNotification(t('accounts.no_refreshable_accounts'), 'warning');
@@ -6774,7 +6812,7 @@ export function AccountsPage() {
 
   const refreshAccountQuota = useCallback(
     async (row: AccountRow, mode: AccountQuotaRefreshMode = 'summary'): Promise<void> => {
-      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider)) return;
+      if (row.runtimeOnly || !isQuotaRefreshSupportedCredential(row.raw, row.provider)) return;
       const refreshKey = getAccountQuotaRefreshKey(row);
       if (manualQuotaRefreshingKeysRef.current.has(refreshKey)) return;
 
@@ -8302,7 +8340,7 @@ export function AccountsPage() {
     const hasSelection = selectionCount > 0;
     const refreshTargets = hasSelection ? selectedRows : pageRows;
     const hasRefreshableTargets = refreshTargets.some(
-      (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+      (row) => !row.runtimeOnly && isQuotaRefreshSupportedCredential(row.raw, row.provider)
     );
     const showSelectionControls = isSelectionMode || hasSelection;
 
@@ -8466,7 +8504,8 @@ export function AccountsPage() {
                 disableControls ||
                 quotaRefreshing ||
                 !selectedRows.some(
-                  (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+                  (row) =>
+                    !row.runtimeOnly && isQuotaRefreshSupportedCredential(row.raw, row.provider)
                 )
               }
               loading={quotaRefreshing}
@@ -8549,7 +8588,7 @@ export function AccountsPage() {
       targetRow.provider === CODEX_CONFIG.type ? 'detail' : 'summary';
 
     const refreshButton =
-      !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider) ? (
+      !row.runtimeOnly && isQuotaRefreshSupportedCredential(row.raw, row.provider) ? (
         <Button
           variant="secondary"
           size="sm"
@@ -10172,7 +10211,8 @@ export function AccountsPage() {
                 {t('accounts.recommend_action_reauth')}
               </Button>
             ) : null}
-            {!selectedRow.runtimeOnly && isQuotaRefreshSupportedProvider(selectedRow.provider) ? (
+            {!selectedRow.runtimeOnly &&
+            isQuotaRefreshSupportedCredential(selectedRow.raw, selectedRow.provider) ? (
               <Button
                 variant="secondary"
                 onClick={() => void refreshAccountQuota(selectedRow, 'detail')}
