@@ -768,6 +768,83 @@ describe('accountQuotaDisplayWindows', () => {
     expect(getAccountQuotaSemanticGroup(windows[1])).toBe('standard');
   });
 
+  it('builds credential quota contract windows for declared plugin providers', () => {
+    const resetAtMs = Date.parse('2026-11-01T00:00:00Z');
+    const stores: AccountQuotaStores = {
+      ...emptyStores(),
+      credentialQuota: {
+        'kiro.json::k-1': {
+          status: 'success',
+          authFileKey: 'kiro.json::k-1',
+          authFileName: 'kiro.json',
+          authIndex: 'k-1',
+          authFileIdentityVerified: true,
+          plan: 'KIRO FREE',
+          observedAtMs: Date.parse('2026-10-21T10:00:00Z'),
+          windows: [
+            {
+              id: '0:0',
+              groupLabel: 'Credits',
+              window: 'monthly',
+              description: '2.79 / 50',
+              remainingPercent: 94.42,
+              resetTime: '2026-11-01T00:00:00Z',
+            },
+            {
+              id: '0:1',
+              groupLabel: 'Credits',
+              window: null,
+              description: null,
+              remainingPercent: null,
+              resetTime: null,
+            },
+          ],
+        },
+      },
+    };
+    const file: AuthFileItem = {
+      name: 'kiro.json',
+      type: 'kiro4cpa',
+      authIndex: 'k-1',
+      supports_quota: true,
+    };
+
+    const windows = buildAccountQuotaDisplayWindows(buildRow(file, stores), {
+      stores,
+      translateQuotaWindowLabel,
+      t,
+    });
+
+    expect(windows).toHaveLength(2);
+    expect(windows[0]).toMatchObject({
+      key: 'credential:0:0',
+      label: 'monthly',
+      kind: 'monthly',
+      groupLabel: 'Credits',
+      amountLabel: '2.79 / 50',
+      remainingPercent: 94.42,
+      resetAtMs,
+      resetAccuracy: 'exact',
+      source: 'credential',
+    });
+    expect(windows[1]).toMatchObject({
+      key: 'credential:0:1',
+      label: 'Credits',
+      remainingPercent: null,
+      usedPercent: null,
+      resetAtMs: null,
+      resetAccuracy: 'unknown',
+    });
+
+    const undeclaredRow = buildRow({ ...file, supports_quota: undefined }, stores);
+    const undeclaredWindows = buildAccountQuotaDisplayWindows(undeclaredRow, {
+      stores,
+      translateQuotaWindowLabel,
+      t,
+    });
+    expect(undeclaredWindows.some((window) => window.source === 'credential')).toBe(false);
+  });
+
   it('keeps Devin windowMode unknown without cycle boundaries when resetAtMs is missing or invalid', () => {
     const stores = {
       ...emptyStores(),

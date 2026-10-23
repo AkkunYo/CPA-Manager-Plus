@@ -34,3 +34,22 @@ export const shouldShowPluginOAuthProvider = (
   builtInProviderIds: ReadonlySet<string>
 ): boolean =>
   plugin.supportsOAuth && !builtInProviderIds.has(resolvePluginOAuthProviderId(plugin));
+
+export const normalizePluginOAuthTitle = (rawTitle: string): string => {
+  const clean = rawTitle.replace(/\s*oauth$/i, '').trim();
+  return clean ? `${clean} OAuth` : rawTitle;
+};
+
+export const normalizePluginOAuthButtonPluginName = (
+  rawTitle: string | undefined,
+  provider: string
+): string => {
+  const title = (rawTitle || provider).replace(/\s*oauth$/i, '').trim();
+  return title || provider;
+};
+
+export const extractUserCodeFromURL = (url?: string): string | undefined => {
+  if (!url) return undefined;
+  const match = /[?&#]user_code=([A-Z0-9-]+)/i.exec(url);
+  return match ? match[1] : undefined;
+};

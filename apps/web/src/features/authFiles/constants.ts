@@ -13,6 +13,7 @@ import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconMeta from '@/assets/icons/meta.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
+import iconKiro from '@/assets/icons/kiro.svg';
 import type { AuthFileItem } from '@/types';
 import { parseTimestamp } from '@/utils/timestamp';
 
@@ -120,6 +121,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#e5f2ff', text: '#0064e0' },
     dark: { bg: '#0b3564', text: '#70b5ff' },
   },
+  kiro: {
+    light: { bg: '#f3e8ff', text: '#7e22ce' },
+    dark: { bg: '#3b0764', text: '#d8b4fe' },
+  },
   empty: {
     light: { bg: '#f5f5f5', text: '#616161' },
     dark: { bg: '#424242', text: '#bdbdbd' },
@@ -143,6 +148,8 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   meta: iconMeta,
   qwen: iconQwen,
   vertex: iconVertex,
+  kiro: iconKiro,
+  kiro4cpa: iconKiro,
 };
 
 export const resolveQuotaErrorMessage = (
@@ -159,11 +166,22 @@ export const normalizeProviderKey = (value: string) => {
   const key = value.trim().toLowerCase().replace(/_/g, '-');
   if (key === 'x-ai' || key === 'grok') return 'xai';
   if (key === 'muse') return 'meta';
+  if (key === 'kiro4cpa') return 'kiro';
   return key;
 };
 
 export const isQuotaRefreshSupportedProvider = (provider: string): boolean =>
   QUOTA_PROVIDER_TYPES.has(normalizeProviderKey(provider) as QuotaProviderType);
+
+/**
+ * Credentials outside the built-in providers fall back to the CPA credential
+ * quota contract when CPA declares `supports_quota` for them.
+ */
+export const usesCredentialQuotaContract = (file: AuthFileItem, provider: string): boolean =>
+  !isQuotaRefreshSupportedProvider(provider) && file.supports_quota === true;
+
+export const isQuotaRefreshSupportedCredential = (file: AuthFileItem, provider: string): boolean =>
+  isQuotaRefreshSupportedProvider(provider) || usesCredentialQuotaContract(file, provider);
 
 
 export const getEquivalentProviderKeys = (value: string): string[] => {
