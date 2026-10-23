@@ -1086,6 +1086,9 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
 };
 
 const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
+// The UI shows the kiro4cpa plugin as kiro; CPA keys its config by the plugin provider.
+const toCPAPluginProvider = (provider: string) =>
+  provider.trim().toLowerCase() === 'kiro' ? 'kiro4cpa' : provider;
 const AUTH_FILE_FORCE_REFRESH_TIMESTAMP = '2000-01-01T00:00:00Z';
 
 const buildAuthFileSourceIdentityPayload = (
@@ -1511,18 +1514,20 @@ export const authFilesApi = {
     requestScope
       ? apiClient.patch(
           '/oauth-excluded-models',
-          { provider, models },
+          { provider: toCPAPluginProvider(provider), models },
           createScopedApiRequestConfig(requestScope)
         )
-      : apiClient.patch('/oauth-excluded-models', { provider, models }),
+      : apiClient.patch('/oauth-excluded-models', {
+          provider: toCPAPluginProvider(provider),
+          models,
+        }),
 
-  deleteOauthExcludedEntry: (provider: string, requestScope?: AuthFilesApiRequestScope) =>
-    requestScope
-      ? apiClient.delete(
-          `/oauth-excluded-models?provider=${encodeURIComponent(provider)}`,
-          createScopedApiRequestConfig(requestScope)
-        )
-      : apiClient.delete(`/oauth-excluded-models?provider=${encodeURIComponent(provider)}`),
+  deleteOauthExcludedEntry: (provider: string, requestScope?: AuthFilesApiRequestScope) => {
+    const endpoint = `/oauth-excluded-models?provider=${encodeURIComponent(toCPAPluginProvider(provider))}`;
+    return requestScope
+      ? apiClient.delete(endpoint, createScopedApiRequestConfig(requestScope))
+      : apiClient.delete(endpoint);
+  },
 
   replaceOauthExcludedModels: (
     map: Record<string, string[]>,
@@ -1628,13 +1633,8 @@ export const authFilesApi = {
       .trim()
       .toLowerCase();
     if (!normalizedChannel) return [];
-    // CPA serves plugin providers under their registered channel, not the UI alias.
     const endpointChannel =
-      normalizedChannel === 'gemini-cli'
-        ? 'gemini'
-        : normalizedChannel === 'kiro'
-          ? 'kiro4cpa'
-          : normalizedChannel;
+      normalizedChannel === 'gemini-cli' ? 'gemini' : toCPAPluginProvider(normalizedChannel);
     const endpoint = `/model-definitions/${encodeURIComponent(endpointChannel)}`;
     const data = requestScope
       ? await apiClient.get<Record<string, unknown>>(
