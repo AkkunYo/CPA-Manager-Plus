@@ -1628,7 +1628,13 @@ export const authFilesApi = {
       .trim()
       .toLowerCase();
     if (!normalizedChannel) return [];
-    const endpointChannel = normalizedChannel === 'gemini-cli' ? 'gemini' : normalizedChannel;
+    // CPA serves plugin providers under their registered channel, not the UI alias.
+    const endpointChannel =
+      normalizedChannel === 'gemini-cli'
+        ? 'gemini'
+        : normalizedChannel === 'kiro'
+          ? 'kiro4cpa'
+          : normalizedChannel;
     const endpoint = `/model-definitions/${encodeURIComponent(endpointChannel)}`;
     const data = requestScope
       ? await apiClient.get<Record<string, unknown>>(

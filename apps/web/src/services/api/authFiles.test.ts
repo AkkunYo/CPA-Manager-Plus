@@ -222,6 +222,13 @@ describe('authFilesApi model endpoints', () => {
     expect(mocks.get).toHaveBeenCalledWith('/model-definitions/gemini');
   });
 
+  it("maps the kiro UI alias to the kiro4cpa plugin channel", async () => {
+    mocks.get.mockResolvedValue({ models: [{ id: 'auto' }] });
+
+    await expect(authFilesApi.getModelDefinitions('kiro')).resolves.toEqual([{ id: 'auto' }]);
+    expect(mocks.get).toHaveBeenCalledWith('/model-definitions/kiro4cpa');
+  });
+
   it('pins model definition requests to the captured CPA connection', async () => {
     mocks.get.mockResolvedValue({ models: [{ id: 'gpt-5-codex' }] });
     const requestScope = {

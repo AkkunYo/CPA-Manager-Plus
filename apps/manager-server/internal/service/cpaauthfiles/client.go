@@ -1404,6 +1404,8 @@ func normalizeAuthProvider(value string) string {
 	switch provider {
 	case "x-ai", "grok":
 		return "xai"
+	case "kiro4cpa":
+		return "kiro"
 	default:
 		return provider
 	}
