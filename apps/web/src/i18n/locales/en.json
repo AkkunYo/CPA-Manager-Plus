@@ -2501,6 +2501,11 @@
     "usage_amount": "{{remaining}} / {{limit}} remaining",
     "reset_unknown": "reset unknown"
   },
+  "credential_quota": {
+    "title": "Credential Quota",
+    "missing_identity": "Credential is missing its auth_index",
+    "empty_data": "No quota data available"
+  },
   "devin_quota": {
     "title": "Devin Quota",
     "empty_title": "No Devin Auth Files",

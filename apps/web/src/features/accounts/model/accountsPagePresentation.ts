@@ -817,6 +817,11 @@ export const selectAccountQuotaMainListWindows = (
     case 'claude':
     default:
       candidates = standardQuotaWindows;
+      if (candidates.length === 0) {
+        // The CPA credential quota contract carries no window length, so its
+        // windows never qualify as standard interval windows; list them as returned.
+        candidates = quotaWindows.filter((window) => window.source === 'credential');
+      }
       break;
   }
 
