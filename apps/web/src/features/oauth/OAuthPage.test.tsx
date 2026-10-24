@@ -4,8 +4,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { OAuthPage } from './OAuthPage';
 import {
+  extractUserCodeFromURL,
   isOAuthProviderAttemptCurrent,
   isOAuthPollingScopeCurrent,
+  normalizePluginOAuthButtonPluginName,
+  normalizePluginOAuthTitle,
   resolvePluginOAuthProviderId,
   shouldShowPluginOAuthProvider,
 } from './oauthProviderHelpers';
@@ -326,6 +329,29 @@ describe('plugin OAuth provider helpers', () => {
         builtInProviderIds
       )
     ).toBe(true);
+  });
+
+  it('normalizes plugin OAuth titles and button names to prevent duplicate OAuth labels', () => {
+    expect(normalizePluginOAuthTitle('Kiro')).toBe('Kiro OAuth');
+    expect(normalizePluginOAuthTitle('Kiro OAuth')).toBe('Kiro OAuth');
+    expect(normalizePluginOAuthTitle('Kiro oauth')).toBe('Kiro OAuth');
+
+    expect(normalizePluginOAuthButtonPluginName('Kiro OAuth', 'kiro4cpa')).toBe('Kiro');
+    expect(normalizePluginOAuthButtonPluginName('Kiro', 'kiro4cpa')).toBe('Kiro');
+    expect(normalizePluginOAuthButtonPluginName('', 'kiro4cpa')).toBe('kiro4cpa');
+  });
+
+  it('extracts user_code from query or hash fragment of device authorization URLs', () => {
+    expect(
+      extractUserCodeFromURL('https://view.awsapps.com/start/#/device?user_code=ZHHW-LQWW')
+    ).toBe('ZHHW-LQWW');
+    expect(
+      extractUserCodeFromURL('https://view.awsapps.com/start?user_code=ABCD-1234')
+    ).toBe('ABCD-1234');
+    expect(
+      extractUserCodeFromURL('https://view.awsapps.com/start/#/device')
+    ).toBeUndefined();
+    expect(extractUserCodeFromURL('')).toBeUndefined();
   });
 
   it('invalidates an OAuth polling attempt after its connection or reauth session changes', () => {

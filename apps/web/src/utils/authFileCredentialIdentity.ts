@@ -43,6 +43,8 @@ const normalizeProvider = (value: unknown): string => {
     .toLowerCase()
     .replace(/_/g, '-');
   if (normalized === 'x-ai' || normalized === 'grok') return 'xai';
+  // Must match normalizeProviderKey, or targets built from it never match their file.
+  if (normalized === 'kiro4cpa') return 'kiro';
   return normalized;
 };
 

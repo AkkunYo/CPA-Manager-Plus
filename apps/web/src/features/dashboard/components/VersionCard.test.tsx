@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ComponentProps } from 'react';
 import type { ConnectionStatus } from '@/types';
 import type { PanelFeatureAvailability } from '@/hooks/usePanelFeatureAvailability';
+import { MANAGER_REPOSITORY_URL } from '@/utils/managerRepository';
 import { VersionCard } from './VersionCard';
 import styles from './VersionCard.module.scss';
 
@@ -258,7 +259,7 @@ describe('VersionCard release links', () => {
     const renderer = await renderCard();
 
     expect(findAnchor(renderer, styles.versionLink, '1.12.6').props.href).toBe(
-      'https://github.com/seakee/CPA-Manager-Plus/releases/tag/v1.12.6'
+      `${MANAGER_REPOSITORY_URL}/releases/tag/v1.12.6`
     );
     expect(findAnchor(renderer, styles.versionLink, '7.2.143').props.href).toBe(
       'https://github.com/router-for-me/CLIProxyAPI/releases/tag/v7.2.143'
@@ -388,9 +389,7 @@ describe('VersionCard external panel fallback', () => {
 
     expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
     const badge = findBadge(renderer, 'a', 'v1.12.12');
-    expect(badge.props.href).toBe(
-      'https://github.com/seakee/CPA-Manager-Plus/releases/tag/v1.12.12'
-    );
+    expect(badge.props.href).toBe(`${MANAGER_REPOSITORY_URL}/releases/tag/v1.12.12`);
     expect(badge.props.target).toBe('_blank');
     expect(badge.props.rel).toBe('noopener noreferrer');
 
@@ -677,9 +676,7 @@ describe('VersionCard external panel fallback', () => {
 
     const badge = findBadge(renderer, 'a', 'v1.12.13');
     expect(badge).toBeDefined();
-    expect(badge.props.href).toBe(
-      'https://github.com/seakee/CPA-Manager-Plus/releases/tag/v1.12.13'
-    );
+    expect(badge.props.href).toBe(`${MANAGER_REPOSITORY_URL}/releases/tag/v1.12.13`);
     mocks.showNotification.mockClear();
 
     await act(async () => {

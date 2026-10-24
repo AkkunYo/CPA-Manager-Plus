@@ -706,3 +706,27 @@ export interface MetaQuotaState
   errorStatus?: number;
 }
 
+/** One bucket of the CPA credential quota contract (POST /quota/fetch). */
+export interface CredentialQuotaWindow {
+  id: string;
+  groupLabel: string | null;
+  window: string | null;
+  description: string | null;
+  remainingPercent: number | null;
+  resetTime: string | null;
+}
+
+export interface CredentialQuotaData {
+  windows: CredentialQuotaWindow[];
+  observedAtMs: number;
+  plan: string | null;
+}
+
+export interface CredentialQuotaState
+  extends CredentialScopedQuotaState,
+    CredentialQuotaData {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error?: string;
+  errorStatus?: number;
+}
+

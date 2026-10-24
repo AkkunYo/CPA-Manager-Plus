@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MANAGER_REPOSITORY_URL } from '@/utils/managerRepository';
 import {
   buildDashboardVersionReleaseURL,
   normalizeDashboardReleaseTag,
@@ -7,7 +8,14 @@ import {
 describe('dashboard version release links', () => {
   it('builds the Manager release URL from a tagged version', () => {
     expect(buildDashboardVersionReleaseURL('manager', 'v1.12.0')).toBe(
-      'https://github.com/seakee/CPA-Manager-Plus/releases/tag/v1.12.0'
+      `${MANAGER_REPOSITORY_URL}/releases/tag/v1.12.0`
+    );
+  });
+
+  it('links fork build tags to the publishing repository', () => {
+    expect(MANAGER_REPOSITORY_URL).toBe('https://github.com/AkkunYo/CPA-Manager-Plus');
+    expect(buildDashboardVersionReleaseURL('manager', 'v1.14.8-cq.3')).toBe(
+      'https://github.com/AkkunYo/CPA-Manager-Plus/releases/tag/v1.14.8-cq.3'
     );
   });
 

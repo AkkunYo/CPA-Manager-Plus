@@ -285,6 +285,27 @@ func TestVerifyIdentityNormalizesProviderAliases(t *testing.T) {
 	}
 }
 
+func TestVerifyIdentityNormalizesKiroPluginProvider(t *testing.T) {
+	file := FromMap(map[string]any{
+		"id":         "kiro4cpa-idc-abc.json",
+		"name":       "kiro4cpa-idc-abc.json",
+		"auth_index": "auth-kiro-1",
+		"provider":   "kiro4cpa",
+	})
+	if file.Provider != "kiro" {
+		t.Fatalf("provider = %q, want kiro", file.Provider)
+	}
+	for _, provider := range []string{"kiro", "kiro4cpa"} {
+		if err := verifyFileIdentity(file, Identity{
+			AuthFileName: "kiro4cpa-idc-abc.json",
+			AuthIndex:    "auth-kiro-1",
+			Provider:     provider,
+		}); err != nil {
+			t.Fatalf("verify provider %q: %v", provider, err)
+		}
+	}
+}
+
 func TestFromMapExtractsNestedAccountIDs(t *testing.T) {
 	tests := []struct {
 		name string

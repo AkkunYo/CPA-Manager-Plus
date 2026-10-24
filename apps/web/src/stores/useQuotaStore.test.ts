@@ -3,6 +3,7 @@ import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
   CodexQuotaState,
+  CredentialQuotaState,
   DevinQuotaState,
   KimiQuotaState,
   MetaQuotaState,
@@ -44,6 +45,7 @@ const readPersistedQuotaState = async () => {
       kimiQuota?: Record<string, KimiQuotaState>;
       metaQuota?: Record<string, MetaQuotaState>;
       xaiQuota?: Record<string, XaiQuotaState>;
+      credentialQuota?: Record<string, CredentialQuotaState>;
     };
   }>(STORAGE_KEY_QUOTA_CACHE);
   return persisted?.state ?? {};
@@ -254,6 +256,36 @@ describe('useQuotaStore persistence', () => {
         quotaInventoryObserved: false,
       },
     });
+    useQuotaStore.getState().setCredentialQuota({
+      credentialSuccess: {
+        status: 'success',
+        windows: [
+          {
+            id: '0:0',
+            groupLabel: 'Credits',
+            window: 'monthly',
+            description: '2.79 / 50',
+            remainingPercent: 94,
+            resetTime: '2026-11-01T00:00:00Z',
+          },
+        ],
+        observedAtMs: 1773000000000,
+        plan: 'KIRO FREE',
+        authFileKey: 'credentialSuccess',
+        authFileIdentityVerified: true,
+      },
+      credentialError: {
+        status: 'error',
+        windows: [],
+        observedAtMs: 1773000000000,
+        plan: null,
+        error: 'credential failed',
+        errorStatus: 502,
+        authFileKey: 'credentialError',
+        authFileIdentityVerified: true,
+      },
+      credentialLoading: { status: 'loading', windows: [], observedAtMs: 1, plan: null },
+    });
 
     const persisted = await readPersistedQuotaState();
 
@@ -266,6 +298,10 @@ describe('useQuotaStore persistence', () => {
     expect(Object.keys(persisted.xaiQuota ?? {})).toEqual(['xaiSuccess', 'xaiError']);
     expect(Object.keys(persisted.devinQuota ?? {})).toEqual(['devinSuccess', 'devinError']);
     expect(Object.keys(persisted.metaQuota ?? {})).toEqual(['metaSuccess', 'metaError']);
+    expect(Object.keys(persisted.credentialQuota ?? {})).toEqual([
+      'credentialSuccess',
+      'credentialError',
+    ]);
 
     const persistedString = JSON.stringify(persisted);
     expect(persistedString).not.toContain('dca:');

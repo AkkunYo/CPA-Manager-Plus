@@ -42,7 +42,10 @@ import {
 } from '@/features/accounts/model/accountReauthSession';
 import {
   isOAuthProviderAttemptCurrent,
+  extractUserCodeFromURL,
   isOAuthPollingScopeCurrent,
+  normalizePluginOAuthButtonPluginName,
+  normalizePluginOAuthTitle,
   resolvePluginOAuthProviderId,
   shouldShowPluginOAuthProvider,
   type OAuthProviderAttempt,
@@ -357,12 +360,14 @@ export function OAuthPage() {
       ? pluginOAuthPlugins
           .filter((plugin) => shouldShowPluginOAuthProvider(plugin, BUILT_IN_PROVIDER_IDS))
           .map((plugin) => {
-            const title = getPluginTitle(plugin);
+            const rawTitle = getPluginTitle(plugin);
+            const title = normalizePluginOAuthTitle(rawTitle);
+            const cleanTitle = normalizePluginOAuthButtonPluginName(rawTitle, plugin.id);
             const logo = resolvePluginAssetURL(plugin.logo || plugin.metadata?.logo || '', apiBase);
             return {
               id: resolvePluginOAuthProviderId(plugin),
               title,
-              hint: t('auth_login.plugin_oauth_hint', { plugin: title }),
+              hint: t('auth_login.plugin_oauth_hint', { plugin: cleanTitle }),
               urlLabel: t('auth_login.plugin_oauth_url_label'),
               icon: logo || undefined,
               supportsCallback: false,
@@ -425,7 +430,7 @@ export function OAuthPage() {
         return t(getAuthKey(provider as BuiltInOAuthProvider, suffix));
       }
       return t(`auth_login.plugin_${suffix}`, {
-        plugin: definition?.title || provider,
+        plugin: normalizePluginOAuthButtonPluginName(definition?.title, provider),
       });
     },
     [getProviderDefinition, t]
@@ -761,10 +766,11 @@ export function OAuthPage() {
         showNotification(message, 'error');
         return;
       }
+      const userCode = res.user_code || extractUserCodeFromURL(res.url);
       updateProviderState(provider, {
         url: res.url,
         state: res.state,
-        userCode: res.user_code,
+        userCode,
         status: 'waiting',
         polling: true,
       });
