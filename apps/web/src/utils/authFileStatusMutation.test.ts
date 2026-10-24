@@ -150,6 +150,26 @@ describe('auth file status identity keys', () => {
 });
 
 describe('resolveAuthFileStatusMutationTarget', () => {
+  it('matches a kiro4cpa plugin credential against its kiro UI target', () => {
+    const file = {
+      id: 'kiro4cpa-idc-abc.json',
+      name: 'kiro4cpa-idc-abc.json',
+      auth_index: 'auth-kiro-1',
+      provider: 'kiro4cpa',
+      type: 'kiro4cpa',
+    } as AuthFileItem;
+
+    expect(readAuthFileStatusProvider(file)).toBe('kiro');
+    const resolution = resolveAuthFileStatusMutationTarget([file], {
+      name: 'kiro4cpa-idc-abc.json',
+      runtimeId: 'kiro4cpa-idc-abc.json',
+      authIndex: 'auth-kiro-1',
+      provider: 'kiro',
+    });
+
+    expect(resolution).toMatchObject({ target: file, failure: null });
+  });
+
   it('fails closed when a previously known runtime ID disappears', () => {
     const resolution = resolveAuthFileStatusMutationTarget(
       [

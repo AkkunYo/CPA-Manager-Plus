@@ -194,6 +194,27 @@ describe('authFilesApi OAuth model alias normalization', () => {
     );
     expect(mocks.delete).toHaveBeenCalledWith('/oauth-model-alias?channel=codex', requestConfig);
   });
+
+  it('writes kiro aliases under the kiro4cpa channel CPA reads', async () => {
+    const methodNotAllowed = Object.assign(new Error('method not allowed'), { status: 405 });
+    mocks.patch.mockResolvedValueOnce({ status: 'ok' }).mockRejectedValueOnce(methodNotAllowed);
+    mocks.delete.mockResolvedValue({ status: 'ok' });
+
+    await authFilesApi.saveOauthModelAlias('kiro', [
+      { name: 'claude-sonnet-5.5', alias: 'claude-sonnet-5-5' },
+    ]);
+    await authFilesApi.deleteOauthModelAlias('Kiro');
+
+    expect(mocks.patch).toHaveBeenNthCalledWith(1, '/oauth-model-alias', {
+      channel: 'kiro4cpa',
+      aliases: [{ name: 'claude-sonnet-5.5', alias: 'claude-sonnet-5-5' }],
+    });
+    expect(mocks.patch).toHaveBeenNthCalledWith(2, '/oauth-model-alias', {
+      channel: 'kiro4cpa',
+      aliases: [],
+    });
+    expect(mocks.delete).toHaveBeenCalledWith('/oauth-model-alias?channel=kiro4cpa');
+  });
 });
 
 describe('authFilesApi model endpoints', () => {
@@ -220,6 +241,32 @@ describe('authFilesApi model endpoints', () => {
       { id: 'gemini-2.5-pro' },
     ]);
     expect(mocks.get).toHaveBeenCalledWith('/model-definitions/gemini');
+  });
+
+  it('maps the kiro UI alias to the kiro4cpa plugin channel', async () => {
+    mocks.get.mockResolvedValue({ models: [{ id: 'auto' }] });
+
+    await expect(authFilesApi.getModelDefinitions('kiro')).resolves.toEqual([{ id: 'auto' }]);
+    expect(mocks.get).toHaveBeenCalledWith('/model-definitions/kiro4cpa');
+  });
+
+  it('writes kiro excluded models under the kiro4cpa provider CPA reads', async () => {
+    mocks.patch.mockResolvedValue({});
+    mocks.delete.mockResolvedValue({});
+
+    await authFilesApi.saveOauthExcludedModels('kiro', ['auto']);
+    await authFilesApi.deleteOauthExcludedEntry('kiro');
+    await authFilesApi.saveOauthExcludedModels('codex', ['gpt-5']);
+
+    expect(mocks.patch).toHaveBeenNthCalledWith(1, '/oauth-excluded-models', {
+      provider: 'kiro4cpa',
+      models: ['auto'],
+    });
+    expect(mocks.delete).toHaveBeenCalledWith('/oauth-excluded-models?provider=kiro4cpa');
+    expect(mocks.patch).toHaveBeenNthCalledWith(2, '/oauth-excluded-models', {
+      provider: 'codex',
+      models: ['gpt-5'],
+    });
   });
 
   it('pins model definition requests to the captured CPA connection', async () => {

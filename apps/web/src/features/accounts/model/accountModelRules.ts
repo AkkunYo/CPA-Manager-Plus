@@ -2,6 +2,7 @@ import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import {
   getProviderRecordValues,
   normalizeExcludedModels,
+  normalizeProviderKey,
   parseExcludedModelsText,
 } from '@/features/authFiles/constants';
 
@@ -26,8 +27,11 @@ const compareVersion = (current: readonly number[], baseline: readonly number[])
 };
 
 export const getAccountModelExclusionPriority = (
-  serverVersion?: string | null
+  serverVersion?: string | null,
+  provider = ''
 ): AccountModelExclusionPriority => {
+  // Kiro filters global exclusions in the plugin before CPA applies credential rules.
+  if (normalizeProviderKey(provider) === 'kiro') return 'merge';
   const normalizedVersion = serverVersion?.trim() ?? '';
   const describeMatch = normalizedVersion.match(CPA_GIT_DESCRIBE_VERSION_PATTERN);
   const match =
@@ -42,6 +46,27 @@ export const getAccountModelExclusionPriority = (
   if (comparison < 0) return 'merge';
   // Commits after the v8.0.32 tag may or may not include the precedence change.
   return describeMatch ? 'unknown' : 'merge';
+};
+
+// OAuth-only plugins may expose only available models through CPA's definitions endpoint.
+// Kiro persists its unfiltered per-account catalog in the credential on refresh.
+export const getAccountStoredModelDefinitions = (
+  provider: string,
+  record?: Record<string, unknown> | null
+): AuthFileModelItem[] => {
+  if (normalizeProviderKey(provider) !== 'kiro') return [];
+  const catalog = record?.kiro4cpa_models;
+  if (!catalog || typeof catalog !== 'object' || !('models' in catalog)) return [];
+  if (!Array.isArray(catalog.models)) return [];
+
+  return catalog.models.flatMap((model: unknown): AuthFileModelItem[] => {
+    if (!model || typeof model !== 'object' || !('modelId' in model)) return [];
+    const id = typeof model.modelId === 'string' ? model.modelId.trim() : '';
+    if (!id) return [];
+    const displayName =
+      'modelName' in model && typeof model.modelName === 'string' ? model.modelName.trim() : '';
+    return [{ id, display_name: displayName || undefined }];
+  });
 };
 
 export type AccountModelRuleScope =

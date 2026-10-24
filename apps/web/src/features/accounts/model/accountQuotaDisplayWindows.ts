@@ -21,6 +21,7 @@ import {
   inferCodexQuotaScopeFromProviderWindowId,
   isCodexMainQuotaModelScope,
 } from '@/utils/quota/codexQuota';
+import { usesCredentialQuotaContract } from '@/features/authFiles/constants';
 import type { AccountRow } from './accountRows';
 import {
   hasConfirmedXaiBillingEntitlement,
@@ -47,6 +48,7 @@ export type AccountQuotaWindowSource =
   | 'kimi'
   | 'meta'
   | 'xai'
+  | 'credential'
   | 'summary';
 
 export interface AccountQuotaDisplayWindow {
@@ -865,7 +867,41 @@ export const buildAccountQuotaDisplayWindows = (
     if (windows.length) return windows;
   }
 
+  if (usesCredentialQuotaContract(row.raw, row.provider)) {
+    const windows = buildCredentialQuotaDisplayWindows(row, options);
+    if (windows.length) return windows;
+  }
+
   return buildSummaryQuotaDisplayWindow(row, options);
+};
+
+const buildCredentialQuotaDisplayWindows = (
+  row: AccountRow,
+  options: BuildAccountQuotaDisplayWindowsOptions
+): AccountQuotaDisplayWindow[] => {
+  const quota = getCredentialScopedQuotaState(options.stores.credentialQuota ?? {}, row.raw);
+  if (!quota || !quota.windows?.length) return [];
+  return quota.windows.map((window) => {
+    const remainingPercent =
+      window.remainingPercent === null ? null : clampDisplayPercent(window.remainingPercent);
+    const reset = resolveAbsoluteQuotaReset(window.resetTime);
+    const label = window.window ?? window.groupLabel ?? options.t('accounts.col_quota');
+    return buildAccountQuotaDisplayWindow({
+      key: `credential:${window.id}`,
+      label,
+      kind: inferAccountQuotaWindowKind({ key: window.window ?? '', label }) ?? undefined,
+      remainingPercent,
+      usedPercent: remainingPercent === null ? null : clampDisplayPercent(100 - remainingPercent),
+      resetLabel: formatDisplayResetTime(window.resetTime ?? undefined),
+      resetAtMs: reset.resetAtMs,
+      resetAccuracy: reset.resetAccuracy,
+      amountLabel: window.description ?? undefined,
+      groupLabel: window.groupLabel ?? undefined,
+      source: 'credential',
+      observedAtMs: quota.observedAtMs ?? quota.fetchedAtMs ?? null,
+      nowMs: options.nowMs,
+    });
+  });
 };
 
 const buildDevinQuotaDisplayWindows = (

@@ -35,6 +35,16 @@ describe('accountModelRules', () => {
     expect(getAccountModelExclusionPriority(version)).toBe(expected);
   });
 
+  it.each(['kiro', 'kiro4cpa', ' KIRO4CPA '])(
+    'keeps %s exclusions cumulative regardless of the CPA version',
+    (provider) => {
+      expect(getAccountModelExclusionPriority('v8.0.35', provider)).toBe('merge');
+      expect(getAccountModelExclusionPriority('custom', provider)).toBe('merge');
+      expect(getAccountModelExclusionPriority(null, provider)).toBe('merge');
+      expect(getAccountModelExclusionPriority('v8.0.35', 'antigravity')).toBe('override');
+    }
+  );
+
   it('shows effective exclusions instead of inactive global matches for newer CPA', () => {
     const args = {
       provider: 'codex',

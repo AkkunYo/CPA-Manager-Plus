@@ -1,0 +1,252 @@
+name: Fork Panel Release
+
+run-name: Fork Panel Release · ${{ inputs.tag }} · ${{ inputs.publish && 'publish' || 'build' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing fork tag, for example v1.14.10-cq.1'
+        required: true
+        type: string
+      expected_sha:
+        description: 'Exact 40-character commit SHA referenced by the tag'
+        required: true
+        type: string
+      notes:
+        description: 'Reviewed release notes; asset size and SHA256 are appended automatically'
+        required: true
+        type: string
+      publish:
+        description: 'Publish the verified panel as the latest stable fork release'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-panel-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'AkkunYo/CPA-Manager-Plus'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      RELEASE_NOTES: ${{ inputs.notes }}
+      VERSION: ${{ inputs.tag }}
+      DEMO_SITE: 'false'
+      VITE_DEMO_SITE: 'false'
+    steps:
+      - name: Validate release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-cq\.[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$RELEASE_NOTES"
+
+      - name: Checkout the existing release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the tagged commit
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/manager-server/go.mod
+          cache-dependency-path: apps/manager-server/go.sum
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit panel production dependencies
+        run: npm audit --workspace apps/web --omit=dev --package-lock-only --ignore-scripts
+
+      - name: Audit high and critical workspace advisories
+        run: npm audit --package-lock-only --ignore-scripts --audit-level=high
+
+      - name: Test web application
+        run: npm run test:web -- --maxWorkers=2
+
+      - name: Test repository tooling
+        run: npm run test:repo -- --maxWorkers=2
+
+      - name: Test Manager Server
+        working-directory: apps/manager-server
+        run: go test ./...
+
+      - name: Lint web application
+        run: npm run lint
+
+      - name: Type-check and build production panel
+        run: npm run build
+
+      - name: Check demo isolation
+        run: npm run check:demo-isolation
+
+      - name: Check icon assets
+        run: npm run check:web-icons
+
+      - name: Prepare panel artifact and release notes
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+          const data = readFileSync('apps/web/dist/index.html');
+          const { RELEASE_TAG: tag, EXPECTED_SHA: commit, RELEASE_NOTES: notes } = process.env;
+          assert(data.includes(Buffer.from(tag)), 'Built panel has the wrong version');
+          assert(data.includes(Buffer.from('AkkunYo/CPA-Manager-Plus')), 'Missing fork update source');
+          const sha256 = createHash('sha256').update(data).digest('hex');
+          const manifest = { tag, commit, asset: 'management.html', size: data.length, sha256 };
+          const body = `${notes.trim()}\n\n## 附件校验\n\n- 文件：\`management.html\`\n- 大小：${data.length} 字节\n- SHA256：\`${sha256}\`\n`;
+          mkdirSync('dist/fork-release', { recursive: true });
+          writeFileSync('dist/fork-release/management.html', data);
+          writeFileSync('dist/fork-release/manifest.json', JSON.stringify(manifest, null, 2));
+          writeFileSync('dist/fork-release/release-notes.md', body);
+          writeFileSync(process.env.GITHUB_STEP_SUMMARY, `Built ${tag} from ${commit}\n\nSHA256: ${sha256}\n`, { flag: 'a' });
+          NODE
+
+      - name: Upload checked build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fork-panel-${{ inputs.tag }}
+          path: dist/fork-release
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release verification helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.22.1'
+
+      - name: Download the checked build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fork-panel-${{ inputs.tag }}
+          path: dist/fork-release
+
+      - name: Resume draft, verify download, and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import path from 'node:path';
+          import { verifyDraftRelease, verifyPublishedRelease } from './bin/release/verify-published-release.mjs';
+
+          const repo = process.env.GITHUB_REPOSITORY;
+          assert.equal(repo, 'AkkunYo/CPA-Manager-Plus');
+          const dir = 'dist/fork-release';
+          const manifest = JSON.parse(readFileSync(`${dir}/manifest.json`, 'utf8'));
+          const { tag, commit, size, sha256 } = manifest;
+          assert.equal(tag, process.env.RELEASE_TAG);
+          assert.equal(commit, process.env.EXPECTED_SHA);
+          assert.match(tag, /^v[0-9]+\.[0-9]+\.[0-9]+-cq\.[1-9][0-9]*$/);
+          assert.match(commit, /^[0-9a-f]{40}$/);
+          assert.equal(manifest.asset, 'management.html');
+          const filePath = `${dir}/management.html`;
+          const data = readFileSync(filePath);
+          const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+          assert.equal(data.length, size);
+          assert.equal(digest(data), sha256);
+          const body = readFileSync(`${dir}/release-notes.md`, 'utf8');
+          const assets = [{ name: 'management.html', size, digest: `sha256:${sha256}`, filePath }];
+          const gh = (args, input) => execFileSync('gh', args, {
+            encoding: 'utf8', input, maxBuffer: 16 * 1024 * 1024, timeout: 180_000,
+          });
+          const api = (route, method = 'GET', payload) => JSON.parse(gh(
+            ['api', `repos/${repo}/${route}`, '--method', method, ...(payload ? ['--input', '-'] : [])],
+            payload ? JSON.stringify(payload) : undefined,
+          ));
+          const verifyTag = () => {
+            let object = api(`git/ref/tags/${tag}`).object;
+            for (let depth = 0; object.type === 'tag' && depth < 5; depth += 1) {
+              object = api(`git/tags/${object.sha}`).object;
+            }
+            assert.equal(object.type, 'commit');
+            assert.equal(object.sha, commit, 'Remote tag changed since the build');
+          };
+          verifyTag();
+          const releases = JSON.parse(gh(['api', `repos/${repo}/releases`, '--paginate', '--slurp'])).flat();
+          const matches = releases.filter((release) => release.tag_name === tag);
+          assert(matches.length <= 1, 'Duplicate releases for the tag');
+          let release = matches[0];
+          if (release && !release.draft) {
+            verifyPublishedRelease({ release, tag, prerelease: false, body, assets });
+            writeFileSync(process.env.GITHUB_STEP_SUMMARY, `Already published and verified: ${release.html_url}\n`, { flag: 'a' });
+            process.exit(0);
+          }
+          if (release) {
+            verifyDraftRelease({ release, tag, prerelease: false, body: release.body, assets, allowMissingAssets: true });
+            assert(!release.immutable, 'Cannot change an immutable draft');
+            release = api(`releases/${release.id}`, 'PATCH', {
+              tag_name: tag, target_commitish: commit, body, name: tag, draft: true, prerelease: false,
+            });
+          } else {
+            release = api('releases', 'POST', {
+              tag_name: tag, target_commitish: commit, name: tag, body, draft: true, prerelease: false,
+            });
+          }
+          const state = verifyDraftRelease({ release, tag, prerelease: false, body, assets, allowMissingAssets: true });
+          for (const asset of state.missingAssets) {
+            gh(['release', 'upload', tag, asset.filePath, '--repo', repo]);
+          }
+          release = api(`releases/${release.id}`);
+          verifyDraftRelease({ release, tag, prerelease: false, body, assets });
+          const downloadDir = mkdtempSync(path.join(tmpdir(), 'fork-panel-download-'));
+          try {
+            gh(['release', 'download', tag, '--repo', repo, '--pattern', 'management.html', '--dir', downloadDir]);
+            const downloaded = readFileSync(path.join(downloadDir, 'management.html'));
+            assert.equal(downloaded.length, size);
+            assert.equal(digest(downloaded), sha256, 'Downloaded release asset differs from the checked build');
+          } finally {
+            rmSync(downloadDir, { recursive: true, force: true });
+          }
+          verifyTag();
+          release = api(`releases/${release.id}`, 'PATCH', {
+            tag_name: tag, target_commitish: commit, body, name: tag,
+            draft: false, prerelease: false, make_latest: 'true',
+          });
+          verifyPublishedRelease({ release, tag, prerelease: false, body, assets });
+          assert.equal(api('releases/latest').id, release.id);
+          writeFileSync(process.env.GITHUB_STEP_SUMMARY, `Published and verified: ${release.html_url}\n\nCommit: ${commit}\n\nSHA256: ${sha256}\n`, { flag: 'a' });
+          NODE

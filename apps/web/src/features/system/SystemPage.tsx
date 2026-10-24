@@ -40,6 +40,7 @@ import iconMinimax from '@/assets/icons/minimax.svg';
 import iconMeta from '@/assets/icons/meta.svg';
 import { DatabaseStatusCard } from './components/DatabaseStatusCard';
 import { useManagerUpdates } from './ManagerUpdates';
+import { MANAGER_REPOSITORY_URL } from '@/utils/managerRepository';
 import styles from './SystemPage.module.scss';
 
 const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: string }> = {
@@ -327,7 +328,7 @@ function SystemPageContent() {
             </a>
 
             <a
-              href="https://github.com/seakee/CPA-Manager-Plus"
+              href={MANAGER_REPOSITORY_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.linkCard}

@@ -2496,6 +2496,11 @@
     "usage_amount": "剩餘 {{remaining}} / {{limit}}",
     "reset_unknown": "重置時間未知"
   },
+  "credential_quota": {
+    "title": "憑證配額",
+    "missing_identity": "憑證缺少 auth_index",
+    "empty_data": "暫無配額資料"
+  },
   "devin_quota": {
     "title": "Devin 配額",
     "empty_title": "暫無 Devin 憑證",

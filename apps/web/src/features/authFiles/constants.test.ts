@@ -5,9 +5,11 @@ import {
   getAuthFileIcon,
   getTypeColor,
   getTypeLabel,
+  isQuotaRefreshSupportedCredential,
   isQuotaRefreshSupportedProvider,
   normalizeProviderKey,
   QUOTA_PROVIDER_TYPES,
+  usesCredentialQuotaContract,
 } from './constants';
 
 describe('authFiles constants - devin', () => {
@@ -107,5 +109,24 @@ describe('authFiles constants - meta', () => {
     expect(isQuotaRefreshSupportedProvider('qwen')).toBe(false);
     expect(isQuotaRefreshSupportedProvider('iflow')).toBe(false);
     expect(isQuotaRefreshSupportedProvider('')).toBe(false);
+  });
+
+  it('falls back to the CPA credential quota contract only for undeclared providers', () => {
+    const pluginFile = { name: 'kiro.json', provider: 'kiro4cpa', supports_quota: true };
+    expect(usesCredentialQuotaContract(pluginFile, 'kiro4cpa')).toBe(true);
+    expect(isQuotaRefreshSupportedCredential(pluginFile, 'kiro4cpa')).toBe(true);
+
+    // CPA must declare support; the provider name alone is never enough.
+    const silentFile = { name: 'kiro.json', provider: 'kiro4cpa' };
+    expect(usesCredentialQuotaContract(silentFile, 'kiro4cpa')).toBe(false);
+    expect(isQuotaRefreshSupportedCredential(silentFile, 'kiro4cpa')).toBe(false);
+    expect(
+      usesCredentialQuotaContract({ name: 'q.json', supports_quota: 'true' }, 'qwen')
+    ).toBe(false);
+
+    // Built-in providers keep their dedicated quota logic.
+    const codexFile = { name: 'codex.json', provider: 'codex', supports_quota: true };
+    expect(usesCredentialQuotaContract(codexFile, 'codex')).toBe(false);
+    expect(isQuotaRefreshSupportedCredential(codexFile, 'codex')).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import type {
   ClaudeQuotaState,
   CodexQuotaState,
   CodexSpendControlLimit,
+  CredentialQuotaState,
   DevinQuotaState,
   KimiQuotaState,
   MetaQuotaState,
@@ -28,6 +29,7 @@ import {
 } from '@/utils/usageHeaderSnapshots';
 import { getCredentialScopedQuotaState } from '@/utils/quota/credentialScope';
 import { isCodexMainQuotaModelScope, isCodexMainQuotaWindow } from '@/utils/quota/codexQuota';
+import { usesCredentialQuotaContract } from '@/features/authFiles/constants';
 import { resolveAuthFilePlanType, resolveAntigravityPlanType } from '@/utils/plans';
 
 export type AccountQuotaStatus =
@@ -81,6 +83,8 @@ export interface AccountQuotaStores {
   kimiQuota: Record<string, KimiQuotaState>;
   metaQuota: Record<string, MetaQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
+  /** CPA credential quota contract fallback for non built-in providers. */
+  credentialQuota?: Record<string, CredentialQuotaState>;
 }
 
 export interface AccountQuotaOverrides {
@@ -1160,6 +1164,23 @@ export const resolveAccountQuota = (
           quota.windows.find((w) => w.quotaProgressObservedAtMs !== null)
             ?.quotaProgressObservedAtMs ?? undefined,
       }
+    );
+  }
+
+  if (usesCredentialQuotaContract(file, provider)) {
+    const quota = getCredentialScopedQuotaState(stores.credentialQuota ?? {}, file);
+    if (!quota) return emptyQuota(filePlanType);
+    const planType = quota.plan ?? filePlanType;
+    if (quota.status === 'loading') return loadingQuota(planType);
+    if (quota.status === 'error')
+      return quotaFromError(quota.error, planType, quota.errorStatus, quota.failedAtMs);
+    return quotaFromRemainingWindows(
+      quota.windows.map((window) => ({
+        remainingPercent: window.remainingPercent,
+        ...resolveAbsoluteQuotaReset(window.resetTime),
+      })),
+      planType,
+      { fetchedAtMs: quota.fetchedAtMs, observedAtMs: quota.observedAtMs }
     );
   }
 

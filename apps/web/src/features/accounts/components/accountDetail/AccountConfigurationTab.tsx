@@ -36,7 +36,8 @@ export function AccountConfigurationTab({
 }: AccountConfigurationTabProps) {
   const { t } = useTranslation();
   const exclusionPriority = getAccountModelExclusionPriority(
-    useAuthStore((authState) => authState.serverVersion)
+    useAuthStore((authState) => authState.serverVersion),
+    editor.state?.providerKey || row.provider
   );
   const reloadButtonId = useId();
   const {

@@ -95,6 +95,7 @@ const makeEditor = ({
   originalPrefix = prefix,
   dirty = false,
   canSave = false,
+  record = { type: 'codex' },
 }: {
   rules?: string;
   originalRules?: string;
@@ -102,6 +103,7 @@ const makeEditor = ({
   originalPrefix?: string;
   dirty?: boolean;
   canSave?: boolean;
+  record?: Record<string, unknown>;
 } = {}): UseAuthFileConfigurationEditorResult => {
   const originalDraft = makeDraft({ excludedModelsText: originalRules, prefix: originalPrefix });
   const draft = makeDraft({ excludedModelsText: rules, prefix });
@@ -112,7 +114,7 @@ const makeEditor = ({
       loading: false,
       saving: false,
       error: '',
-      record: { type: 'codex' },
+      record,
       recordIndex: null,
       providerKey: 'codex',
       originalDraft,
@@ -190,6 +192,124 @@ const findLoadingSpinners = (renderer: ReactTestRenderer) =>
   );
 
 describe('AccountModelsTab', () => {
+  it.each(['kiro', 'kiro4cpa'])(
+    'restores excluded models from the %s credential catalog with cumulative rule states',
+    (provider) => {
+      mockAuthState.serverVersion = 'v8.0.35';
+      const editor = makeEditor({
+        rules: 'claude-haiku-4.5\ndeepseek-3.2',
+        record: {
+          type: 'kiro4cpa',
+          kiro4cpa_models: {
+            models: [
+              { modelId: 'auto', modelName: 'Auto' },
+              { modelId: 'claude-sonnet-4.5', modelName: 'Claude Sonnet 4.5' },
+              { modelId: 'claude-haiku-4.5', modelName: 'Claude Haiku 4.5' },
+              { modelId: 'deepseek-3.2', modelName: 'DeepSeek 3.2' },
+            ],
+          },
+        },
+      });
+      const { renderer, props } = renderTab({
+        row: makeRow({ provider }),
+        fileType: provider,
+        editor,
+        models: [{ id: 'auto' }],
+        modelDefinitions: [{ id: 'auto' }],
+        globalExcluded: { kiro4cpa: ['claude-sonnet-*', 'deepseek-3.2'] },
+      });
+
+      expect(renderer.root.findAllByType('article')).toHaveLength(4);
+      expect(findModelRow(renderer, 'auto').props['data-model-scope']).toBe('available');
+      expect(findModelRow(renderer, 'claude-sonnet-4.5').props['data-model-scope']).toBe('global');
+      expect(findModelRow(renderer, 'claude-haiku-4.5').props['data-model-scope']).toBe('credential');
+      expect(findModelRow(renderer, 'deepseek-3.2').props['data-model-scope']).toBe('both');
+      expect(readText(findModelRow(renderer, 'claude-sonnet-4.5'))).toContain('Claude Sonnet 4.5');
+
+      act(() => {
+        findButtonByText(
+          findModelRow(renderer, 'deepseek-3.2'),
+          'accounts.model_remove_exact_rule'
+        ).props.onClick();
+      });
+      expect(editor.updateField).toHaveBeenCalledWith('excludedModelsText', 'claude-haiku-4.5');
+      act(() => {
+        renderer.update(
+          <AccountModelsTab
+            {...props}
+            editor={makeEditor({ rules: 'claude-haiku-4.5', record: editor.state!.record! })}
+          />
+        );
+      });
+      expect(findModelRow(renderer, 'deepseek-3.2').props['data-model-scope']).toBe('global');
+      expect(readText(findModelRow(renderer, 'deepseek-3.2'))).toContain(
+        'accounts.model_manage_global_rules'
+      );
+      expect(readText(renderer.toJSON())).not.toContain('inheriting_global');
+
+      act(() => {
+        renderer.root.findByProps({ id: 'account-model-filter-disabled' }).props.onClick({
+          preventDefault: vi.fn(),
+        });
+      });
+      expect(renderer.root.findAllByType('article')).toHaveLength(3);
+    }
+  );
+
+  it('shows fully excluded Kiro models even without a runtime list or definitions endpoint', () => {
+    mockAuthState.serverVersion = 'v8.0.35';
+    const { renderer } = renderTab({
+      row: makeRow({ provider: 'kiro' }),
+      fileType: 'kiro',
+      modelDefinitionsError: 'unsupported',
+      globalExcluded: { kiro: ['*'] },
+      editor: makeEditor({
+        record: {
+          type: 'kiro4cpa',
+          kiro4cpa_models: {
+            models: [
+              null,
+              { modelId: 123 },
+              { modelId: ' ' },
+              { modelId: ' claude-sonnet-4.5 ', modelName: ' Sonnet ' },
+              { modelId: 'CLAUDE-SONNET-4.5' },
+              { modelId: 'auto', modelName: 123 },
+            ],
+          },
+        },
+      }),
+    });
+    expect(renderer.root.findAllByType('article')).toHaveLength(2);
+    expect(findModelRow(renderer, 'claude-sonnet-4.5').props['data-model-scope']).toBe('global');
+    expect(findModelRow(renderer, 'auto').props['data-model-scope']).toBe('global');
+  });
+
+  it.each([undefined, null, 'invalid', [], { models: null }, { models: {} }])(
+    'keeps runtime models when the stored Kiro catalog is invalid: %j',
+    (catalog) => {
+      const { renderer } = renderTab({
+        row: makeRow({ provider: 'kiro' }),
+        fileType: 'kiro',
+        models: [{ id: 'auto' }],
+        editor: makeEditor({ record: { type: 'kiro4cpa', kiro4cpa_models: catalog } }),
+      });
+      expect(renderer.root.findAllByType('article')).toHaveLength(1);
+      expect(findModelRow(renderer, 'auto').props['data-model-scope']).toBe('available');
+    }
+  );
+
+  it('does not use a Kiro catalog for other providers', () => {
+    const { renderer } = renderTab({
+      models: [{ id: 'gpt-5.5' }],
+      globalExcluded: { codex: ['*'] },
+      editor: makeEditor({
+        record: { type: 'codex', kiro4cpa_models: { models: [{ modelId: 'auto' }] } },
+      }),
+    });
+    expect(renderer.root.findAllByType('article')).toHaveLength(1);
+    expect(findModelRow(renderer, 'gpt-5.5').props['data-model-scope']).toBe('global');
+  });
+
   it('does not render animated icons for automatic model loading', () => {
     const editor = makeEditor();
     editor.state = { ...editor.state!, loading: true };

@@ -10,6 +10,7 @@ import {
   buildAccountModelRuleDiff,
   buildAccountModelRuleProjection,
   getAccountModelExclusionPriority,
+  getAccountStoredModelDefinitions,
   setEffectiveAccountModelExactRule,
   type AccountModelRuleRow,
   type AccountModelRuleScope,
@@ -112,11 +113,15 @@ export function AccountModelsTab({
 }: AccountModelsTabProps) {
   const { t } = useTranslation();
   const serverVersion = useAuthStore((state) => state.serverVersion);
-  const exclusionPriority = getAccountModelExclusionPriority(serverVersion);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<AccountModelFilter>('all');
   const { state, draft, dirty, canSave, sharedSourceReadOnly, sourceMemberCount } = editor;
   const providerKey = normalizeProviderKey(fileType || row.provider);
+  const exclusionPriority = getAccountModelExclusionPriority(serverVersion, providerKey);
+  const accountModelDefinitions = useMemo(
+    () => [...modelDefinitions, ...getAccountStoredModelDefinitions(providerKey, state?.record)],
+    [modelDefinitions, providerKey, state?.record]
+  );
   const globalRulesKnown = globalExcludedState === 'ready';
   const aliasEntries = useMemo(() => {
     const seen = new Set<string>();
@@ -149,7 +154,7 @@ export function AccountModelsTab({
       buildAccountModelRuleProjection({
         provider: providerKey,
         runtimeModels: models,
-        modelDefinitions,
+        modelDefinitions: accountModelDefinitions,
         credentialRules,
         globalRules: globalRulesKnown ? globalExcluded : {},
         globalRulesKnown,
@@ -163,7 +168,7 @@ export function AccountModelsTab({
       exclusionPriority,
       globalExcluded,
       globalRulesKnown,
-      modelDefinitions,
+      accountModelDefinitions,
       models,
       providerKey,
       sharedSourceReadOnly,

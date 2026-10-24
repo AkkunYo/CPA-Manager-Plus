@@ -2,6 +2,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Select } from '@/components/ui/Select';
+import { MANAGER_REPOSITORY_URL } from '@/utils/managerRepository';
 import { ManagerUpdatePage } from './ManagerUpdatePage';
 import type { ReleaseInfo, UpdateStatus } from './managerUpdateApi';
 
@@ -104,9 +105,7 @@ describe('ManagerUpdatePage', () => {
     const download = renderer!.root.find(
       (node) => node.type === 'a' && text(node).includes('manager_updates.native_download')
     );
-    expect(download.props.href).toBe(
-      'https://github.com/seakee/CPA-Manager-Plus/releases/tag/v1.12.11'
-    );
+    expect(download.props.href).toBe(`${MANAGER_REPOSITORY_URL}/releases/tag/v1.12.11`);
     expect(renderer!.root.findByProps({ role: 'tabpanel' }).props['aria-labelledby']).toBe(
       'manager-deployment-native'
     );
